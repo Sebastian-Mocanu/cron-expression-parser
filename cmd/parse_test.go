@@ -126,13 +126,93 @@ day of week   0 1 2 3 4 5 6
 command       /scripts/quarter-hourly.sh
 `,
 		},
+		{
+			name:           "Complex range and step",
+			cronExpression: "1-15/2 */4 1-7,15-21 1,3,5,7,9,11 1-5 /scripts/complex-schedule.sh",
+			expectedOutput: `minute        1 3 5 7 9 11 13 15
+hour          0 4 8 12 16 20
+day of month  1 2 3 4 5 6 7 15 16 17 18 19 20 21
+month         1 3 5 7 9 11
+day of week   1 2 3 4 5
+command       /scripts/complex-schedule.sh
+`,
+		},
+		{
+			name:           "Invalid minute step",
+			cronExpression: "*/95 0 1,15 * 1-5 /usr/bin/find",
+			expectedOutput: `minute        Error: step value 95 is too large for range 0-59
+hour          0
+day of month  1 15
+month         1 2 3 4 5 6 7 8 9 10 11 12
+day of week   1 2 3 4 5
+`,
+		},
+		{
+			name:           "Invalid day of week range",
+			cronExpression: "*/15 0 1,15 * 1-12 /usr/bin/find",
+			expectedOutput: `minute        0 15 30 45
+hour          0
+day of month  1 15
+month         1 2 3 4 5 6 7 8 9 10 11 12
+day of week   Error: range 1-12 out of bounds (allowed range: 0-6)
+`,
+		},
+		{
+			name:           "Invalid hour value",
+			cronExpression: "0 24 1,15 * 1-5 /usr/bin/find",
+			expectedOutput: `minute        0
+hour          Error: value 24 out of range (allowed range: 0-23)
+day of month  1 15
+month         1 2 3 4 5 6 7 8 9 10 11 12
+day of week   1 2 3 4 5
+`,
+		},
+		{
+			name:           "Invalid day of month",
+			cronExpression: "0 0 0,32 * 1-5 /usr/bin/find",
+			expectedOutput: `minute        0
+hour          0
+day of month  Error: value 0 out of range (allowed range: 1-31)
+month         1 2 3 4 5 6 7 8 9 10 11 12
+day of week   1 2 3 4 5
+`,
+		},
+		{
+			name:           "Invalid month",
+			cronExpression: "0 0 1 0,13 1-5 /usr/bin/find",
+			expectedOutput: `minute        0
+hour          0
+day of month  1
+month         Error: value 0 out of range (allowed range: 1-12)
+day of week   1 2 3 4 5
+`,
+		},
+		{
+			name:           "Multiple errors",
+			cronExpression: "*/100 26 0-32 0,13 1-7 /usr/bin/find",
+			expectedOutput: `minute        Error: step value 100 is too large for range 0-59
+hour          Error: value 26 out of range (allowed range: 0-23)
+day of month  Error: range 0-32 out of bounds (allowed range: 1-31)
+month         Error: value 0 out of range (allowed range: 1-12)
+day of week   Error: range 1-7 out of bounds (allowed range: 0-6)
+`,
+		},
+		{
+			name:           "Invalid step in day of month",
+			cronExpression: "0 0 */0 * * /scripts/invalid-step.sh",
+			expectedOutput: `minute        0
+hour          0
+day of month  Error: step value must be positive
+month         1 2 3 4 5 6 7 8 9 10 11 12
+day of week   0 1 2 3 4 5 6
+`,
+		},
 	}
 
 	passCount := 0
 	failCount := 0
 
 	for _, test := range tests {
-
 		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
