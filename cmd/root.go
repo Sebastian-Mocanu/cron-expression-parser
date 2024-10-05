@@ -1,6 +1,3 @@
-/*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -14,7 +11,7 @@ var rootCmd = &cobra.Command{
 	Use:   "cron-expression-parser",
 	Short: "This is a cron parser cli application",
 	Long: `This is a cron parser cli application that will take in a a simple string in the cron standard format with with five time fields (minute, hour, day of month, month, day of week) 
-			+ a command. The out output will be formatted as a table with the field name taking the first 14 columns and the times as a space-separated list following it.`,
+	+ a command. The out output will be formatted as a table with the field name taking the first 14 columns and the times as a space-separated list following it.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },

@@ -2,12 +2,26 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 )
+
+type CronField struct {
+	Name  string
+	Min   int
+	Max   int
+	Index int
+}
+
+var cronFields = []CronField{
+	{Name: "minute", Min: 0, Max: 59, Index: 0},
+	{Name: "hour", Min: 0, Max: 23, Index: 1},
+	{Name: "day of month", Min: 1, Max: 31, Index: 2},
+	{Name: "month", Min: 1, Max: 12, Index: 3},
+	{Name: "day of week", Min: 0, Max: 6, Index: 4},
+}
 
 var parseCmd = &cobra.Command{
 	Use:   "parse [cron expression]",
@@ -29,68 +43,104 @@ func parseCronExpression(cronExpr string) {
 	fields := strings.Fields(cronExpr)
 	if len(fields) < 6 {
 		fmt.Println("Invalid cron expression. Expected at least 6 fields.")
-		os.Exit(1)
+		return
 	}
 
-	fieldNames := []string{"minute", "hour", "day of month", "month", "day of week", "command"}
-	for i, field := range fields {
-		if i < 5 {
-			fmt.Printf("%-14s", fieldNames[i])
-			expandField(field, i)
-		} else {
-			fmt.Printf("%-14s%s\n", fieldNames[5], strings.Join(fields[5:], " "))
-			break
-		}
+	for i, field := range cronFields {
+		fmt.Printf("%-14s", field.Name)
+		expandField(fields[i], field)
+		fmt.Println()
 	}
+
+	fmt.Printf("%-14s%s\n", "command", strings.Join(fields[5:], " "))
 }
 
-func expandField(field string, fieldIndex int) {
-	var expanded []string
-	fieldRange := getFieldRange(fieldIndex)
+func expandField(field string, cronField CronField) {
+	var expanded []int
 
 	if field == "*" {
-		expanded = expandRange(fieldRange[0], fieldRange[1])
-	} else if strings.Contains(field, "/") {
-		parts := strings.Split(field, "/")
-		step, _ := strconv.Atoi(parts[1])
-		for i := fieldRange[0]; i <= fieldRange[1]; i += step {
-			expanded = append(expanded, strconv.Itoa(i))
-		}
-	} else if strings.Contains(field, "-") {
-		parts := strings.Split(field, "-")
-		start, _ := strconv.Atoi(parts[0])
-		end, _ := strconv.Atoi(parts[1])
-		expanded = expandRange(start, end)
-	} else if strings.Contains(field, ",") {
-		expanded = strings.Split(field, ",")
+		expanded = expandRange(cronField.Min, cronField.Max)
 	} else {
-		expanded = []string{field}
+		parts := strings.Split(field, ",")
+		for _, part := range parts {
+			if strings.Contains(part, "/") {
+				expanded = append(expanded, expandStep(part, cronField)...)
+			} else if strings.Contains(part, "-") {
+				expanded = append(expanded, expandRange(parseRange(part))...)
+			} else {
+				num, _ := strconv.Atoi(part)
+				if num >= cronField.Min && num <= cronField.Max {
+					expanded = append(expanded, num)
+				}
+			}
+		}
 	}
 
-	fmt.Println(strings.Join(expanded, " "))
+	expanded = uniqueSort(expanded)
+
+	for i, num := range expanded {
+		if i > 0 {
+			fmt.Print(" ")
+		}
+		fmt.Print(num)
+	}
 }
 
-func expandRange(start, end int) []string {
-	var expanded []string
-	for i := start; i <= end; i++ {
-		expanded = append(expanded, strconv.Itoa(i))
+func expandStep(field string, cronField CronField) []int {
+	parts := strings.Split(field, "/")
+	var start, end int
+
+	if parts[0] == "*" {
+		start, end = cronField.Min, cronField.Max
+	} else if strings.Contains(parts[0], "-") {
+		start, end = parseRange(parts[0])
+	} else {
+		start, _ = strconv.Atoi(parts[0])
+		end = cronField.Max
+	}
+
+	step, _ := strconv.Atoi(parts[1])
+	return expandRange(start, end, step)
+}
+
+func parseRange(field string) (int, int) {
+	parts := strings.Split(field, "-")
+	start, _ := strconv.Atoi(parts[0])
+	end, _ := strconv.Atoi(parts[1])
+	return start, end
+}
+
+func expandRange(start, end int, step ...int) []int {
+	var expanded []int
+	stepValue := 1
+	if len(step) > 0 {
+		stepValue = step[0]
+	}
+	for i := start; i <= end; i += stepValue {
+		expanded = append(expanded, i)
 	}
 	return expanded
 }
 
-func getFieldRange(fieldIndex int) []int {
-	switch fieldIndex {
-	case 0: // minute
-		return []int{0, 59}
-	case 1: // hour
-		return []int{0, 23}
-	case 2: // day of month
-		return []int{1, 31}
-	case 3: // month
-		return []int{1, 12}
-	case 4: // day of week
-		return []int{0, 6}
-	default:
-		return []int{0, 0}
+func uniqueSort(nums []int) []int {
+	if len(nums) == 0 {
+		return nums
 	}
+
+	for i := 0; i < len(nums); i++ {
+		for j := i + 1; j < len(nums); j++ {
+			if nums[i] > nums[j] {
+				nums[i], nums[j] = nums[j], nums[i]
+			}
+		}
+	}
+
+	unique := nums[:1]
+	for i := 1; i < len(nums); i++ {
+		if nums[i] != nums[i-1] {
+			unique = append(unique, nums[i])
+		}
+	}
+
+	return unique
 }
